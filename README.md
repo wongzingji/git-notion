@@ -16,6 +16,10 @@ cd git-notion
 pip install -e .
 ```
 
+### Preparation
+To import the markdown files to a subpage in Notion, you need to edit the `limit` parameter in `notion-py` library according to [this](https://github.com/NarekA/git-notion/issues/1#issuecomment-1171158725).
+
+
 ### Configuring
 
 `NOTION_TOKEN_V2` - Can be found in your [browser cookies](https://www.redgregory.com/notion/2020/6/15/9zuzav95gwzwewdu1dspweqbv481s5) for Notion's website.
