@@ -60,7 +60,7 @@ def sync_to_notion(md_folder: str = "."):
     '''
     os.chdir(md_folder)
     config = ConfigParser()
-    config.read(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+    config.read(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'setup.cfg'))
     name = os.path.basename(md_folder)
 
     root_page_url = os.getenv("NOTION_ROOT_PAGE") or config.get('git-notion', 'notion_root_page')
