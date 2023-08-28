@@ -1,0 +1,4 @@
+click==8.1.7
+md2notion==2.4.1
+notion==0.0.28
+setuptools==65.6.3
