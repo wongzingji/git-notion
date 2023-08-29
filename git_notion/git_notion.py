@@ -1,3 +1,6 @@
+"""
+This script imports markdown files to Notion pages using unofficial Notion API for Python.
+"""
 import hashlib
 import os
 import glob
