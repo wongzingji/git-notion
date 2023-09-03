@@ -1,14 +1,18 @@
-"""Main module."""
+"""
+This script imports markdown files to Notion pages using unofficial Notion API for Python.
+"""
 import hashlib
 import os
 import glob
 from configparser import ConfigParser
 import re
+import logging
+import time
 
 from notion.block import PageBlock
-from notion.block import TextBlock
 from notion.client import NotionClient
-from md2notion.upload import upload
+# from md2notion.upload import upload
+from md2notion.upload import convert, uploadBlock
 
 
 TOKEN = os.getenv("NOTION_TOKEN_V2", "")
@@ -26,15 +30,17 @@ def get_or_create_page(base_page, title):
     page = None
     for child in base_page.children.filter(PageBlock):
         if child.title == title:
+            # get page
             page = child
 
     if not page:
+        # create page
         page = base_page.children.add_new(PageBlock, title=title)
     return page
 
 
 def upload_file(base_page, filename: str, page_title=None):
-    page_title = page_title or filename
+    page_title = page_title or filename # if no title specified, use file name
     page = get_or_create_page(base_page, page_title)
     hasher = hashlib.md5()
     with open(filename, "rb") as mdFile:
@@ -43,26 +49,40 @@ def upload_file(base_page, filename: str, page_title=None):
     if page.children and hasher.hexdigest() in str(page.children[0]):
         return page
 
-    for child in page.children:
-        child.remove()
-    page.children.add_new(TextBlock, title=f"MD5: {hasher.hexdigest()}")
+    # for child in page.children:
+    #     child.remove()
+    # page.children.add_new(TextBlock, title=f"MD5: {hasher.hexdigest()}")
 
     with open(filename, "r", encoding="utf-8") as mdFile:
-        upload(mdFile, page)
+        rendered = convert(mdFile)
+        for blockDescriptor in rendered:
+            print(blockDescriptor)
+            # time.sleep(1)
+            uploadBlock(blockDescriptor, page, mdFile.name)
+    
     return page
 
 
-def sync_to_notion(repo_root: str = "."):
-    os.chdir(repo_root)
+def sync_to_notion(md_folder: str = "."):
+    '''
+    strategy: overwrite
+    '''
+    os.chdir(md_folder)
     config = ConfigParser()
-    config.read(os.path.join(repo_root, "setup.cfg"))
-    repo_name = os.path.basename(os.getcwd())
+    config.read(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'setup.cfg'))
+    name = os.path.basename(md_folder)
 
     root_page_url = os.getenv("NOTION_ROOT_PAGE") or config.get('git-notion', 'notion_root_page')
     ignore_regex = os.getenv("NOTION_IGNORE_REGEX") or config.get('git-notion', 'ignore_regex', fallback=None)
     root_page = get_client().get_block(root_page_url)
-    repo_page = get_or_create_page(root_page, repo_name)
+    page = get_or_create_page(root_page, name)
     for file in glob.glob("**/*.md", recursive=True):
+        print(file)
         if ignore_regex is None or not re.match(ignore_regex, file):
-            print(file)
-            upload_file(repo_page, file)
+            logging.info(file)
+            if '/' in file: # nested path
+                subpage = get_or_create_page(page, os.path.dirname(file))
+                upload_file(subpage, file, page_title=os.path.basename(file))
+            else:
+                upload_file(page, file)
+
