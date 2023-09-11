@@ -5,8 +5,11 @@ Syncs Gitlab markdown files to Notion.
 
 The scripts are modified based on the [git-notion](https://github.com/NarekA/git-notion) repository. It makes use of the [`md2notion` module](https://github.com/Cobertos/md2notion), and relies on the [unofficial Notion API for Python](https://github.com/jamalex/notion-py).
 
-The modification is mainly creating nested pages according to the folder hierarchy.
+Modifications:
+- Creating nested pages according to the folder hierarchy
+- Giving an option to rewrite or append the content to the pages
 
+----
 
 ### Installation
 ```bash

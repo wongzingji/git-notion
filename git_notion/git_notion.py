@@ -7,15 +7,18 @@ import glob
 from configparser import ConfigParser
 import re
 import logging
-import time
+from tqdm import tqdm
 
 from notion.block import PageBlock
 from notion.client import NotionClient
-# from md2notion.upload import upload
-from md2notion.upload import convert, uploadBlock
+from md2notion.upload import upload
 
 
 TOKEN = os.getenv("NOTION_TOKEN_V2", "")
+HEADERS = {
+            "Authorization": "Bearer " + os.getenv("NOTION_TOKEN", ""),
+            "Notion-Version": "2022-02-22"
+        }
 _client = None
 
 
@@ -26,7 +29,16 @@ def get_client():
     return _client
 
 
-def get_or_create_page(base_page, title):
+def get_or_create_page(base_page, title: str):
+    '''
+    Get or create a page
+
+    Args:
+    base_page: a page object
+
+    Returns:
+    a page object
+    '''
     page = None
     for child in base_page.children.filter(PageBlock):
         if child.title == title:
@@ -39,7 +51,11 @@ def get_or_create_page(base_page, title):
     return page
 
 
-def upload_file(base_page, filename: str, page_title=None):
+def upload_file(base_page, filename: str, page_title: str = None, append: bool = False):
+    '''
+    Function to upload the content for a single page
+    using the unofficial API except for the images
+    '''
     page_title = page_title or filename # if no title specified, use file name
     page = get_or_create_page(base_page, page_title)
     hasher = hashlib.md5()
@@ -47,25 +63,19 @@ def upload_file(base_page, filename: str, page_title=None):
         buf = mdFile.read()
         hasher.update(buf)
     if page.children and hasher.hexdigest() in str(page.children[0]):
-        return page
+        return
 
-    # for child in page.children:
-    #     child.remove()
-    # page.children.add_new(TextBlock, title=f"MD5: {hasher.hexdigest()}")
+    if not append:
+        for child in page.children:
+            child.remove()
 
     with open(filename, "r", encoding="utf-8") as mdFile:
-        rendered = convert(mdFile)
-        for blockDescriptor in rendered:
-            print(blockDescriptor)
-            # time.sleep(1)
-            uploadBlock(blockDescriptor, page, mdFile.name)
-    
-    return page
+        upload(mdFile, page)
 
 
-def sync_to_notion(md_folder: str = "."):
+def sync_to_notion(md_folder: str = ".", append: bool = False):
     '''
-    strategy: overwrite
+    Synchronize the md files iteratively
     '''
     os.chdir(md_folder)
     config = ConfigParser()
@@ -76,13 +86,13 @@ def sync_to_notion(md_folder: str = "."):
     ignore_regex = os.getenv("NOTION_IGNORE_REGEX") or config.get('git-notion', 'ignore_regex', fallback=None)
     root_page = get_client().get_block(root_page_url)
     page = get_or_create_page(root_page, name)
-    for file in glob.glob("**/*.md", recursive=True):
+    for file in tqdm(glob.glob("**/*.md", recursive=True), 'Processing the md files'):
         print(file)
         if ignore_regex is None or not re.match(ignore_regex, file):
             logging.info(file)
             if '/' in file: # nested path
                 subpage = get_or_create_page(page, os.path.dirname(file))
-                upload_file(subpage, file, page_title=os.path.basename(file))
+                upload_file(subpage, file, page_title=os.path.basename(file), append=append)
             else:
-                upload_file(page, file)
+                upload_file(page, file, append=append)
 
